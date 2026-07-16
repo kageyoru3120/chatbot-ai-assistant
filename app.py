@@ -24,7 +24,6 @@ html, body, [class*="css"] {
     font-family: 'Inter', sans-serif;
 }
 
-/* Background gradient animasi */
 .stApp {
     background: linear-gradient(-45deg, #0f0c29, #302b63, #24243e, #1a1a2e);
     background-size: 400% 400%;
@@ -37,7 +36,6 @@ html, body, [class*="css"] {
     100% { background-position: 0% 50%; }
 }
 
-/* Sidebar glassmorphism */
 [data-testid="stSidebar"] {
     background: rgba(255, 255, 255, 0.05) !important;
     backdrop-filter: blur(20px) !important;
@@ -45,36 +43,10 @@ html, body, [class*="css"] {
     border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
 
-/* Chat bubble user */
-[data-testid="stChatMessage"] [data-testid="stChatMessageContent"]:has([data-testid="stMarkdownContainer"]) {
-    background: rgba(255, 255, 255, 0.1) !important;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 20px 20px 4px 20px;
-    padding: 16px;
-    color: #ffffff;
+h1, h2, h3, h4, h5, h6, p, label, span {
+    color: #ffffff !important;
 }
 
-/* Chat bubble assistant */
-[data-testid="stChatMessage"][data-testid="stChatMessage"]:nth-child(even) [data-testid="stChatMessageContent"] {
-    background: rgba(99, 102, 241, 0.2) !important;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(99, 102, 241, 0.3);
-    border-radius: 20px 20px 20px 4px;
-    padding: 16px;
-    color: #ffffff;
-}
-
-/* Input box */
-[data-testid="stChatInput"] {
-    background: rgba(255, 255, 255, 0.08) !important;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
-    border-radius: 16px;
-    color: #ffffff;
-}
-
-/* Tombol */
 .stButton > button {
     background: rgba(99, 102, 241, 0.3) !important;
     backdrop-filter: blur(10px);
@@ -91,8 +63,7 @@ html, body, [class*="css"] {
     box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
 }
 
-/* Select box */
-.stSelectbox > div > div {
+.stSelectbox > div > div, .stTextInput > div > div, .stNumberInput > div > div {
     background: rgba(255, 255, 255, 0.08) !important;
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.15) !important;
@@ -100,12 +71,6 @@ html, body, [class*="css"] {
     color: #ffffff !important;
 }
 
-/* Text color global */
-h1, h2, h3, h4, h5, h6, p, label, span {
-    color: #ffffff !important;
-}
-
-/* Scrollbar cantik */
 ::-webkit-scrollbar {
     width: 8px;
 }
@@ -123,7 +88,6 @@ h1, h2, h3, h4, h5, h6, p, label, span {
     background: rgba(99, 102, 241, 0.8);
 }
 
-/* Quick prompt buttons */
 div[data-testid="stHorizontalBlock"] button {
     background: rgba(255, 255, 255, 0.08) !important;
     border: 1px solid rgba(255, 255, 255, 0.15) !important;
@@ -142,12 +106,6 @@ div[data-testid="stHorizontalBlock"] button:hover {
     border-color: rgba(99, 102, 241, 0.5) !important;
     color: #ffffff !important;
 }
-
-/* Avatar styling */
-[data-testid="stChatMessageAvatar"] {
-    background: rgba(99, 102, 241, 0.3) !important;
-    border-radius: 50% !important;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -164,9 +122,34 @@ except Exception as e:
 # PERSONA SYSTEM PROMPT
 # ============================================
 PERSONAS = {
+    "📈 Analis Market Pro": """Kamu adalah analis market profesional dengan spesialisasi crypto dan forex. 
+Gunakan bahasa Indonesia santai (aku/kamu). 
+
+ATURAN WAJIB:
+1. SELALU ingatkan bahwa ini BUKAN financial advice
+2. Jelaskan istilah teknikal dengan analogi simpel:
+   - RSI = "kelelahan harga" (0-30: oversold/lelah jual, 70-100: overbought/lelah beli)
+   - MACD = "persimpangan jalan" (golden cross = jalan lurus, death cross = belok bahaya)
+   - Support = "lantai" harga, Resistance = "atap" harga
+   - Volume = "semangat pasar" (volume tinggi = banyak yang ikutan)
+3. Sebutkan timeframe analisis (1H, 4H, 1D)
+4. Kasih 2 skenario: bullish case & bearish case
+5. Sebutkan level support & resistance kunci
+6. Jangan overconfident — market bisa berubah kapan aja
+
+FORMAT JAWABAN:
+📊 Asset: [nama]
+⏰ Timeframe: [timeframe]
+📈 Analisis Teknikal: [penjelasan simpel]
+🎯 Level Kunci: Support $X | Resistance $Y
+🐂 Bullish Case: [skenario naik + trigger]
+🐻 Bearish Case: [skenario turun + trigger]
+⚠️ Disclaimer: Bukan saran finansial. DYOR!""",
+    
     "🧑‍💻 Programmer": "Kamu adalah programmer senior yang ramah. Jelaskan konsep coding dengan analogi sederhana. Gunakan bahasa Indonesia santai (aku/kamu). Hindari jargon berlebihan.",
+    
     "🎬 Kreator Konten": "Kamu adalah kreator konten kreatif. Berikan ide konten, script, atau tips viral dengan gaya santai dan engaging. Bahasa Indonesia gaul tapi tetap sopan.",
-    "📈 Analis Crypto": "Kamu adalah analis crypto yang realistis. Jelaskan analisis teknikal dengan bahasa sederhana. SELALU ingatkan bahwa ini bukan financial advice dan crypto sangat volatile.",
+    
     "🤙 Teman Ngobrol": "Kamu adalah teman ngobrol santai. Jawab dengan gaya conversational, pakai bahasa Indonesia sehari-hari, dan sesekali kasih emoji. Jangan terlalu formal."
 }
 
@@ -187,30 +170,29 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 if "selected_persona" not in st.session_state:
-    st.session_state.selected_persona = "🤙 Teman Ngobrol"
+    st.session_state.selected_persona = "📈 Analis Market Pro"
 
 if "selected_model" not in st.session_state:
     st.session_state.selected_model = "⚡ Llama 3.1 8B (Cepat)"
 
 # ============================================
-# SIDEBAR
+# SIDEBAR - TAB PENGATURAN & MARKET
 # ============================================
-with st.sidebar:
+tab1, tab2 = st.sidebar.tabs(["⚙️ Pengaturan", "📊 Market"])
+
+with tab1:
     st.markdown("### ⚙️ Pengaturan")
     
-    # Pilih Persona
     persona = st.selectbox(
         "🎭 Persona AI",
         options=list(PERSONAS.keys()),
         index=list(PERSONAS.keys()).index(st.session_state.selected_persona)
     )
     st.session_state.selected_persona = persona
-    
     st.caption(f"*{persona}* aktif")
     
     st.divider()
     
-    # Pilih Model
     model = st.selectbox(
         "🔧 Model AI",
         options=list(MODELS.keys()),
@@ -220,7 +202,6 @@ with st.sidebar:
     
     st.divider()
     
-    # Export Chat
     if st.session_state.messages:
         chat_history = ""
         for msg in st.session_state.messages:
@@ -234,7 +215,6 @@ with st.sidebar:
             mime="text/plain"
         )
     
-    # Clear Chat
     if st.button("🗑️ Hapus Chat", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
@@ -242,6 +222,68 @@ with st.sidebar:
     st.divider()
     st.markdown("**Ditenagai oleh:**")
     st.markdown("🚀 Groq  •  🦙 Llama 3  •  📊 Streamlit")
+
+with tab2:
+    st.markdown("### 📈 Input Data Market")
+    st.caption("Masukkan data dari TradingView untuk analisis AI")
+    
+    # Asset & Timeframe
+    col1, col2 = st.columns(2)
+    with col1:
+        asset = st.text_input("💱 Asset", value="BTC/USDT", key="asset_input")
+    with col2:
+        timeframe = st.selectbox(
+            "⏱️ Timeframe",
+            ["1m", "5m", "15m", "1H", "4H", "1D", "1W"],
+            index=3
+        )
+    
+    # Harga
+    current_price = st.number_input("💰 Harga Sekarang ($)", value=0.0, step=0.01, key="price_input")
+    
+    # Indikator Teknikal (opsional, dalam expander)
+    with st.expander("📉 Indikator Teknikal (opsional)"):
+        col_rsi, col_macd = st.columns(2)
+        with col_rsi:
+            rsi = st.number_input("RSI (0-100)", min_value=0, max_value=100, value=50)
+        with col_macd:
+            macd = st.number_input("MACD", value=0.0, step=0.01)
+        
+        col_vol, col_atr = st.columns(2)
+        with col_vol:
+            volume = st.number_input("Volume 24h", value=0.0, step=1000000.0)
+        with col_atr:
+            atr = st.number_input("ATR", value=0.0, step=0.01)
+        
+        col_sup, col_res = st.columns(2)
+        with col_sup:
+            support = st.number_input("Support ($)", value=0.0, step=0.01)
+        with col_res:
+            resistance = st.number_input("Resistance ($)", value=0.0, step=0.01)
+    
+    # Tombol Analisis
+    if st.button("🚀 Analisis Data Ini", use_container_width=True):
+        # Bangun konteks market
+        market_context = f"""Data Market {asset} ({timeframe}):
+💰 Harga Sekarang: ${current_price:,.2f}"""
+        
+        if rsi != 50:
+            market_context += f"\n📊 RSI: {rsi}"
+        if macd != 0:
+            market_context += f"\n📈 MACD: {macd}"
+        if volume != 0:
+            market_context += f"\n📦 Volume 24h: ${volume:,.0f}"
+        if atr != 0:
+            market_context += f"\n📏 ATR: {atr}"
+        if support != 0:
+            market_context += f"\n🟢 Support: ${support:,.2f}"
+        if resistance != 0:
+            market_context += f"\n🔴 Resistance: ${resistance:,.2f}"
+        
+        market_context += f"\n\nBerdasarkan data di atas, analisis teknikal {asset} gimana?"
+        
+        st.session_state.messages.append({"role": "user", "content": market_context})
+        st.rerun()
 
 # ============================================
 # HEADER
@@ -252,32 +294,30 @@ st.markdown("""
         🤖 Chatbot AI Kageyoru
     </h1>
     <p style="color: rgba(255,255,255,0.6); font-size: 1rem; margin-top: -10px;">
-        Asisten AI cepat & cerdas untuk berbagai kebutuhanmu
+        Asisten AI untuk analisis market & berbagai kebutuhanmu
     </p>
 </div>
 """, unsafe_allow_html=True)
 
 # ============================================
-# QUICK PROMPTS (Tampil kalau chat kosong)
+# QUICK PROMPTS (Market Focused)
 # ============================================
 if not st.session_state.messages:
     st.markdown("### 🎯 Mulai dengan pertanyaan ini:")
     
     quick_prompts = [
-        "Jelaskan AI itu apa, tapi kayak aku umur 5 tahun",
-        "Analisis teknikal BTC minggu ini gimana?",
-        "Kasih ide konten TikTok tentang teknologi AI",
-        "Bantu aku debug Python: list index out of range"
+        "Analisis BTC minggu ini, bullish or bearish?",
+        "Jelasin RSI itu apa sih? Gimana cara bacanya?",
+        "Support & Resistance itu kayak gimana? Kasih analogi dong",
+        "Tips aman trading crypto buat pemula"
     ]
     
     cols = st.columns(2)
     for idx, prompt in enumerate(quick_prompts):
         with cols[idx % 2]:
             if st.button(prompt, key=f"quick_{idx}", use_container_width=True):
-                # Simulate user input
                 st.session_state.messages.append({"role": "user", "content": prompt})
                 
-                # Get AI response
                 try:
                     system_msg = PERSONAS[st.session_state.selected_persona]
                     groq_messages = [{"role": "system", "content": system_msg}]
@@ -302,20 +342,19 @@ if not st.session_state.messages:
 # TAMPILKAN CHAT HISTORY
 # ============================================
 for message in st.session_state.messages:
-    with st.chat_message(message["role"], avatar="🧑" if message["role"] == "user" else "🤖"):
+    avatar = "🧑" if message["role"] == "user" else "🤖"
+    with st.chat_message(message["role"], avatar=avatar):
         st.markdown(message["content"])
 
 # ============================================
 # INPUT CHAT
 # ============================================
 if prompt := st.chat_input("Ketik pesanmu di sini..."):
-    # Tambah pesan user
     st.session_state.messages.append({"role": "user", "content": prompt})
     
     with st.chat_message("user", avatar="🧑"):
         st.markdown(prompt)
     
-    # AI Response dengan streaming
     with st.chat_message("assistant", avatar="🤖"):
         message_placeholder = st.empty()
         full_response = ""
@@ -327,7 +366,6 @@ if prompt := st.chat_input("Ketik pesanmu di sini..."):
             for m in st.session_state.messages:
                 groq_messages.append({"role": m["role"], "content": m["content"]})
             
-            # Stream response
             stream = client.chat.completions.create(
                 model=MODELS[st.session_state.selected_model],
                 messages=groq_messages,
@@ -342,8 +380,6 @@ if prompt := st.chat_input("Ketik pesanmu di sini..."):
                     message_placeholder.markdown(full_response + "▌")
             
             message_placeholder.markdown(full_response)
-            
-            # Simpan ke session
             st.session_state.messages.append({"role": "assistant", "content": full_response})
             
         except Exception as e:
