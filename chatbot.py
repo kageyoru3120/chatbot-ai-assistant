@@ -1,77 +1,72 @@
-"""
-Chatbot Sederhana - Asisten Ide Konten AI/Teknologi
-=====================================================
-Ini project belajar coding pertama kamu! Chatbot ini bakal jadi
-"partner curhat" buat brainstorm ide konten AI & Teknologi.
-
-Cara kerja singkatnya:
-1. Kamu ngetik pesan di terminal
-2. Pesan itu dikirim ke Claude API
-3. Claude balas, dan balasannya muncul di terminal
-4. Diulang terus sampai kamu ketik 'exit'
-"""
-
 import os
-from anthropic import Anthropic
 from dotenv import load_dotenv
+from groq import Groq
 
-# STEP 1: Load API key dari file .env
-# (Kita nggak pernah nulis API key langsung di kode, biar aman
-# kalau nanti di-push ke GitHub)
+# 1. Load environment variables dari file .env
 load_dotenv()
-api_key = os.getenv("ANTHROPIC_API_KEY")
 
-if not api_key:
-    print("❌ API key belum ketemu! Cek lagi file .env kamu.")
-    exit()
+# 2. Ambil API Key dari .env
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-# STEP 2: Bikin koneksi ke Claude API
-client = Anthropic(api_key=api_key)
+if not GROQ_API_KEY:
+    print("❌ Error: GROQ_API_KEY tidak ditemukan di file .env!")
+    exit(1)
 
-# STEP 3: Kasih "kepribadian" ke chatbot ini lewat system prompt
-SYSTEM_PROMPT = """Kamu adalah asisten brainstorming ide konten untuk
-kreator konten AI & Teknologi di Indonesia, target audiens usia 18-34 tahun.
-Gaya bicara kamu santai, kayak temen ngobrol, pakai bahasa Indonesia
-yang natural (boleh 'kamu', 'nggak', 'banget', 'cuan').
-Fokus bahas 3 hal: Uang (side hustle/AI buat cari cuan), Karir (AI di
-tempat kerja), dan Kehidupan sehari-hari (AI buat produktivitas).
-Jawaban singkat, praktis, dan to the point. Hindari kata klise kayak
-'merevolusi' atau 'mencengangkan'."""
+# 3. Inisialisasi Client Groq
+client = Groq(api_key=GROQ_API_KEY)
 
-# STEP 4: Nyimpen riwayat chat, biar chatbot inget percakapan sebelumnya
-conversation_history = []
+def start_chat():
+    print("\n==================================================")
+    print("⚡ Groq AI (Llama 3) - Content Brainstorming Chatbot")
+    print("==================================================")
+    print("Ketik 'keluar' atau 'exit' untuk mengakhiri chat.\n")
+    
+    # Membuat sistem penyimpanan riwayat chat manual (memori chatbot)
+    history = [
+        {
+            "role": "system",
+            "content": (
+                "Kamu adalah asisten kreatif khusus untuk membantu konten kreator "
+                "melakukan brainstorming ide konten. Berikan jawaban yang terstruktur, "
+                "kreatif, interaktif, dan mudah dipahami."
+            )
+        }
+    ]
+    
+    while True:
+        try:
+            user_input = input("👤 Kamu: ")
+            
+            # Cek kondisi keluar
+            if user_input.lower() in ['keluar', 'exit']:
+                print("\n🤖 Assistant: Sampai jumpa! Semangat bikin kontennya! 🚀")
+                break
+                
+            if not user_input.strip():
+                continue
+                
+            print("🤖 Assistant sedang berpikir...")
+            
+            # Masukkan input kamu ke dalam riwayat
+            history.append({"role": "user", "content": user_input})
+            
+            # Kirim seluruh riwayat obrolan ke Groq API
+            chat_completion = client.chat.completions.create(
+                messages=history,
+                model="llama-3.1-8b-instant",  # Model gratis terbaik, super cepat, dan andal di Groq
+            )
+            
+            # Ambil balasan teks dari AI
+            response_text = chat_completion.choices[0].message.content
+            
+            # Simpan balasan AI ke riwayat agar diingat pada chat berikutnya
+            history.append({"role": "assistant", "content": response_text})
+            
+            print(f"\n🤖 Assistant:\n{response_text}\n")
+            print("-" * 50)
+            
+        except Exception as e:
+            print(f"\n❌ Terjadi kesalahan saat mengirim pesan: {e}\n")
 
-print("=" * 50)
-print("🤖 Asisten Ide Konten AI/Teknologi")
-print("Ketik pesan kamu, atau ketik 'exit' buat keluar.")
-print("=" * 50)
-
-# STEP 5: Loop percakapan - ini jantungnya chatbot
-while True:
-    user_input = input("\n👤 Kamu: ")
-
-    if user_input.lower() in ["exit", "quit", "keluar"]:
-        print("\n👋 Sampai ketemu lagi! Semangat bikin konten ya!")
-        break
-
-    # Tambahin pesan user ke riwayat
-    conversation_history.append({"role": "user", "content": user_input})
-
-    # Kirim ke Claude API
-    try:
-        response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=1000,
-            system=SYSTEM_PROMPT,
-            messages=conversation_history,
-        )
-
-        # Ambil teks balasan dari Claude
-        reply = response.content[0].text
-        print(f"\n🤖 Asisten: {reply}")
-
-        # Tambahin balasan Claude ke riwayat juga
-        conversation_history.append({"role": "assistant", "content": reply})
-
-    except Exception as e:
-        print(f"\n❌ Ada error nih: {e}")
+if __name__ == "__main__":
+    start_chat()
