@@ -10,8 +10,8 @@ from plotly.subplots import make_subplots
 # KONFIGURASI PAGE
 # ============================================
 st.set_page_config(
-    page_title="Chatbot AI Kageyoru",
-    page_icon="🤖",
+    page_title="KAGEYORU TERMINAL",
+    page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -21,54 +21,97 @@ st.set_page_config(
 # ============================================
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+    --terminal-bg: #08090c;
+    --terminal-panel: #0d0f14;
+    --terminal-border: rgba(240, 180, 41, 0.15);
+    --amber: #f0b429;
+    --amber-dim: rgba(240, 180, 41, 0.5);
+    --amber-glow: rgba(240, 180, 41, 0.12);
+    --up: #22c55e;
+    --down: #ef4444;
+    --text-dim: rgba(255,255,255,0.55);
+}
 
 html, body, [class*="css"] {
     font-family: 'Inter', sans-serif;
 }
 
-.stApp {
-    background: linear-gradient(-45deg, #0f0c29, #302b63, #24243e, #1a1a2e);
-    background-size: 400% 400%;
-    animation: gradientBG 15s ease infinite;
+/* Numbers, labels, headers get a mono terminal feel */
+h1, h2, h3, .stMetric, [data-testid="stMetricValue"], [data-testid="stMetricLabel"] {
+    font-family: 'IBM Plex Mono', monospace !important;
 }
 
-@keyframes gradientBG {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
+.stApp {
+    background:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(240,180,41,0.06), transparent),
+        linear-gradient(180deg, #08090c 0%, #0a0b0f 100%);
+}
+
+/* subtle terminal grid overlay */
+.stApp::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(240,180,41,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(240,180,41,0.025) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+    z-index: 0;
 }
 
 [data-testid="stSidebar"] {
-    background: rgba(255, 255, 255, 0.05) !important;
-    backdrop-filter: blur(20px) !important;
-    border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+    background: var(--terminal-panel) !important;
+    border-right: 1px solid var(--terminal-border) !important;
 }
 
 h1, h2, h3, h4, h5, h6, p, label, span {
-    color: #ffffff !important;
+    color: #f4f4f2 !important;
+    letter-spacing: 0.2px;
+}
+
+.stCaption, [data-testid="stCaptionContainer"] {
+    color: var(--text-dim) !important;
 }
 
 .stButton > button {
-    background: rgba(99, 102, 241, 0.3) !important;
-    border: 1px solid rgba(99, 102, 241, 0.4) !important;
-    border-radius: 12px;
-    color: #ffffff !important;
+    background: rgba(240, 180, 41, 0.06) !important;
+    border: 1px solid var(--amber-dim) !important;
+    border-radius: 4px;
+    color: #f0b429 !important;
+    font-family: 'IBM Plex Mono', monospace;
     font-weight: 500;
-    transition: all 0.3s ease;
+    letter-spacing: 0.3px;
+    transition: all 0.2s ease;
 }
 
 .stButton > button:hover {
-    background: rgba(99, 102, 241, 0.5) !important;
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
+    background: var(--amber-glow) !important;
+    border-color: var(--amber) !important;
+    color: #ffd166 !important;
+    box-shadow: 0 0 16px rgba(240,180,41,0.25);
 }
 
 .stSelectbox > div > div, .stTextInput > div > div, .stNumberInput > div > div {
-    background: rgba(255, 255, 255, 0.08) !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
-    border-radius: 12px;
-    color: #ffffff !important;
+    background: var(--terminal-panel) !important;
+    border: 1px solid var(--terminal-border) !important;
+    border-radius: 4px;
+    color: #f4f4f2 !important;
+    font-family: 'IBM Plex Mono', monospace;
+}
+
+[data-testid="stMetric"] {
+    background: var(--terminal-panel);
+    border: 1px solid var(--terminal-border);
+    border-radius: 4px;
+    padding: 12px 16px;
+}
+
+hr, [data-testid="stDivider"] {
+    border-color: var(--terminal-border) !important;
 }
 
 ::-webkit-scrollbar {
@@ -76,34 +119,37 @@ h1, h2, h3, h4, h5, h6, p, label, span {
 }
 
 ::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--terminal-bg);
 }
 
 ::-webkit-scrollbar-thumb {
-    background: rgba(99, 102, 241, 0.5);
-    border-radius: 10px;
+    background: var(--amber-dim);
+    border-radius: 4px;
 }
 
 [data-testid="stChatMessage"] [data-testid="stChatMessageContent"] {
-    background: rgba(255, 255, 255, 0.1) !important;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 20px 20px 4px 20px;
+    background: var(--terminal-panel) !important;
+    border: 1px solid var(--terminal-border);
+    border-radius: 6px;
     padding: 16px;
-    color: #ffffff;
+    color: #f4f4f2;
 }
 
 [data-testid="stChatMessage"]:nth-child(even) [data-testid="stChatMessageContent"] {
-    background: rgba(99, 102, 241, 0.2) !important;
-    border: 1px solid rgba(99, 102, 241, 0.3);
-    border-radius: 20px 20px 20px 4px;
+    background: rgba(240, 180, 41, 0.05) !important;
+    border: 1px solid var(--amber-dim);
+    border-left: 2px solid var(--amber);
 }
 
 [data-testid="stChatInput"] {
-    background: rgba(255, 255, 255, 0.08) !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
-    border-radius: 16px;
-    color: #ffffff;
+    background: var(--terminal-panel) !important;
+    border: 1px solid var(--terminal-border) !important;
+    border-radius: 6px;
+    color: #f4f4f2;
+}
+
+[data-testid="stChatInput"]:focus-within {
+    border-color: var(--amber) !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -146,8 +192,6 @@ FORMAT JAWABAN:
 ⚠️ Disclaimer: Bukan saran finansial. DYOR!""",
     
     "🧑‍💻 Programmer": "Kamu adalah programmer senior yang ramah. Jelaskan konsep coding dengan analogi sederhana. Gunakan bahasa Indonesia santai.",
-    
-    "🎬 Kreator Konten": "Kamu adalah kreator konten kreatif. Berikan ide konten, script, atau tips viral dengan gaya santai. Bahasa Indonesia gaul tapi tetap sopan.",
     
     "🤙 Teman Ngobrol": "Kamu adalah teman ngobrol santai. Jawab dengan gaya conversational, pakai bahasa Indonesia sehari-hari, dan sesekali kasih emoji."
 }
@@ -444,12 +488,12 @@ Berdasarkan data di atas, analisis teknikal {data['symbol'].upper()} gimana?"""
 # HEADER
 # ============================================
 st.markdown("""
-<div style="text-align: center; padding: 20px 0;">
-    <h1 style="font-size: 2.5rem; font-weight: 700; background: linear-gradient(90deg, #818cf8, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
-        🤖 Chatbot AI Kageyoru
+<div style="text-align: center; padding: 24px 0 12px 0; position: relative; z-index: 1;">
+    <h1 style="font-family: 'IBM Plex Mono', monospace; font-size: 2.1rem; font-weight: 700; letter-spacing: 4px; color: #f0b429; margin-bottom: 4px;">
+        📈 KAGEYORU TERMINAL
     </h1>
-    <p style="color: rgba(255,255,255,0.6); font-size: 1rem; margin-top: -10px;">
-        Asisten AI untuk analisis market & berbagai kebutuhanmu
+    <p style="color: rgba(255,255,255,0.45); font-size: 0.85rem; font-family: 'IBM Plex Mono', monospace; letter-spacing: 1px; text-transform: uppercase; margin-top: 0;">
+        Personal Trading Intelligence · Bukan Financial Advice
     </p>
 </div>
 """, unsafe_allow_html=True)
@@ -463,8 +507,8 @@ if not st.session_state.messages:
     quick_prompts = [
         "Analisis BTC minggu ini, bullish or bearish?",
         "Jelasin RSI itu apa sih? Gimana cara bacanya?",
-        "Kasih ide konten TikTok tentang teknologi AI",
-        "Bantu aku debug Python: list index out of range"
+        "Cara set stop loss & take profit yang aman gimana?",
+        "Kapan waktu terbaik entry saat market sideways?"
     ]
     
     cols = st.columns(2)
