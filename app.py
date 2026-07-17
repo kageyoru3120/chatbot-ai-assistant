@@ -132,6 +132,16 @@ div[data-testid="stHorizontalBlock"] button:hover {
     border-radius: 16px;
     color: #ffffff;
 }
+
+/* Chart container styling */
+.chart-container {
+    background: rgba(15, 15, 30, 0.6) !important;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 16px;
+    margin-top: 12px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -314,6 +324,9 @@ if "ohlc_data" not in st.session_state:
 if "chart_data" not in st.session_state:
     st.session_state.chart_data = None
 
+if "pending_chart" not in st.session_state:
+    st.session_state.pending_chart = None
+
 # ============================================
 # SIDEBAR - TAB PENGATURAN & MARKET
 # ============================================
@@ -359,6 +372,7 @@ with tab1:
         st.session_state.market_data = None
         st.session_state.ohlc_data = None
         st.session_state.chart_data = None
+        st.session_state.pending_chart = None
         st.rerun()
 
 with tab2:
@@ -373,7 +387,7 @@ with tab2:
     
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("🔄 Refresh Harga + Chart", use_container_width=True):
+        if st.button("🔄 Refresh Harga", use_container_width=True):
             with st.spinner("Mengambil data dari CoinGecko..."):
                 data = get_crypto_price(selected_id)
                 ohlc_data = get_coin_ohlc(selected_id, days=7)
@@ -383,6 +397,20 @@ with tab2:
                     st.session_state.market_data = data
                     st.session_state.ohlc_data = ohlc_data if "error" not in ohlc_data else None
                     st.session_state.chart_data = chart_data if "error" not in chart_data else None
+                    
+                    # Simpan chart yang akan ditampilkan setelah AI response
+                    if st.session_state.ohlc_data is not None:
+                        st.session_state.pending_chart = {
+                            "type": "candlestick",
+                            "data": st.session_state.ohlc_data,
+                            "name": selected_name
+                        }
+                    elif st.session_state.chart_data is not None:
+                        st.session_state.pending_chart = {
+                            "type": "line",
+                            "data": st.session_state.chart_data,
+                            "name": selected_name
+                        }
                     
                     change_emoji = "🟢" if data['change_24h'] >= 0 else "🔴"
                     change_sign = "+" if data['change_24h'] >= 0 else ""
@@ -417,7 +445,7 @@ Berdasarkan data di atas, analisis teknikal {data['symbol'].upper()} gimana?"""
                 else:
                     st.error(f"❌ Error: {trending['error']}")
     
-    # Tampilkan data terakhir + CHART
+    # Tampilkan data terakhir (ringkas saja di sidebar)
     if st.session_state.market_data:
         d = st.session_state.market_data
         change_sign = "+" if d['change_24h'] >= 0 else ""
@@ -431,37 +459,7 @@ Berdasarkan data di atas, analisis teknikal {data['symbol'].upper()} gimana?"""
         with col_change:
             st.metric("Change 24h", f"{change_sign}{d['change_24h']:.2f}%")
         
-        col_vol, col_cap = st.columns(2)
-        with col_vol:
-            st.metric("Volume 24h", f"${d['volume_24h']:,.0f}")
-        with col_cap:
-            st.metric("Market Cap", f"${d['market_cap']:,.0f}")
-        
         st.caption(f"📡 Source: {d['source']} | ⏰ {d['last_updated'][:19]}")
-        
-        # CHART CANDLESTICK
-        if st.session_state.ohlc_data is not None:
-            st.markdown("---")
-            st.markdown("### 📈 Chart 7 Hari")
-            
-            fig = create_candlestick_chart(
-                st.session_state.ohlc_data, 
-                coin_name=selected_name
-            )
-            st.plotly_chart(fig, use_container_width=True, key="candlestick_chart")
-            
-            st.caption("💡 Hover/scroll untuk zoom. Hijau = naik, Merah = turun.")
-        
-        # LINE CHART (fallback)
-        elif st.session_state.chart_data is not None:
-            st.markdown("---")
-            st.markdown("### 📈 Price Chart 7 Hari")
-            
-            fig = create_price_chart(
-                st.session_state.chart_data,
-                coin_name=selected_name
-            )
-            st.plotly_chart(fig, use_container_width=True, key="price_chart")
     
     # Input manual fallback
     with st.expander("📝 Input Data Manual (dari TradingView)"):
@@ -542,44 +540,54 @@ if not st.session_state.messages:
         with cols[idx % 2]:
             if st.button(prompt, key=f"quick_{idx}", use_container_width=True):
                 st.session_state.messages.append({"role": "user", "content": prompt})
-                
-                try:
-                    system_msg = PERSONAS[st.session_state.selected_persona]
-                    groq_messages = [{"role": "system", "content": system_msg}]
-                    for m in st.session_state.messages:
-                        groq_messages.append({"role": m["role"], "content": m["content"]})
-                    
-                    response = client.chat.completions.create(
-                        model=MODELS[st.session_state.selected_model],
-                        messages=groq_messages,
-                        temperature=0.7,
-                        max_tokens=1024
-                    )
-                    
-                    ai_response = response.choices[0].message.content
-                    st.session_state.messages.append({"role": "assistant", "content": ai_response})
-                except Exception as e:
-                    st.session_state.messages.append({"role": "assistant", "content": f"Waduh, error: {str(e)}"})
-                
                 st.rerun()
 
 # ============================================
-# TAMPILKAN CHAT HISTORY
+# TAMPILKAN CHAT HISTORY + CHART
 # ============================================
-for message in st.session_state.messages:
+
+# Cek apakah ada chart pending yang harus ditampilkan setelah AI response
+last_message_is_ai = False
+if len(st.session_state.messages) > 0:
+    last_message_is_ai = st.session_state.messages[-1]["role"] == "assistant"
+
+for i, message in enumerate(st.session_state.messages):
     avatar = "🧑" if message["role"] == "user" else "🤖"
+    
     with st.chat_message(message["role"], avatar=avatar):
         st.markdown(message["content"])
+    
+    # Tampilkan chart setelah AI response (bukan setelah user message)
+    # dan hanya jika ini adalah pesan AI terakhir dan ada pending chart
+    if message["role"] == "assistant" and i == len(st.session_state.messages) - 1:
+        if st.session_state.pending_chart:
+            st.markdown("---")
+            st.markdown("### 📊 Chart Analisis")
+            
+            chart_info = st.session_state.pending_chart
+            
+            if chart_info["type"] == "candlestick":
+                fig = create_candlestick_chart(
+                    chart_info["data"], 
+                    coin_name=chart_info["name"]
+                )
+                st.plotly_chart(fig, use_container_width=True, key=f"chart_candle_{i}")
+                st.caption("💡 Hover/scroll untuk zoom. Hijau = naik, Merah = turun.")
+            
+            elif chart_info["type"] == "line":
+                fig = create_price_chart(
+                    chart_info["data"],
+                    coin_name=chart_info["name"]
+                )
+                st.plotly_chart(fig, use_container_width=True, key=f"chart_line_{i}")
+            
+            # Reset pending chart setelah ditampilkan
+            st.session_state.pending_chart = None
 
 # ============================================
-# INPUT CHAT
+# AI RESPONSE (kalau user baru kirim pesan)
 # ============================================
-if prompt := st.chat_input("Ketik pesanmu di sini..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    
-    with st.chat_message("user", avatar="🧑"):
-        st.markdown(prompt)
-    
+if len(st.session_state.messages) > 0 and st.session_state.messages[-1]["role"] == "user":
     with st.chat_message("assistant", avatar="🤖"):
         message_placeholder = st.empty()
         full_response = ""
@@ -607,7 +615,41 @@ if prompt := st.chat_input("Ketik pesanmu di sini..."):
             message_placeholder.markdown(full_response)
             st.session_state.messages.append({"role": "assistant", "content": full_response})
             
+            # Tampilkan chart setelah AI selesai merespons
+            if st.session_state.pending_chart:
+                st.markdown("---")
+                st.markdown("### 📊 Chart Analisis")
+                
+                chart_info = st.session_state.pending_chart
+                
+                if chart_info["type"] == "candlestick":
+                    fig = create_candlestick_chart(
+                        chart_info["data"], 
+                        coin_name=chart_info["name"]
+                    )
+                    st.plotly_chart(fig, use_container_width=True, key="chart_candle_main")
+                    st.caption("💡 Hover/scroll untuk zoom. Hijau = naik, Merah = turun.")
+                
+                elif chart_info["type"] == "line":
+                    fig = create_price_chart(
+                        chart_info["data"],
+                        coin_name=chart_info["name"]
+                    )
+                    st.plotly_chart(fig, use_container_width=True, key="chart_line_main")
+                
+                # Reset pending chart
+                st.session_state.pending_chart = None
+            
+            st.rerun()
+            
         except Exception as e:
             error_msg = f"Waduh, terjadi kesalahan: {str(e)}"
             message_placeholder.error(error_msg)
             st.session_state.messages.append({"role": "assistant", "content": error_msg})
+
+# ============================================
+# INPUT CHAT
+# ============================================
+if prompt := st.chat_input("Ketik pesanmu di sini..."):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    st.rerun()
