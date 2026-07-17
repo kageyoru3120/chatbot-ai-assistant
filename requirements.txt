@@ -2,3 +2,4 @@ groq
    python-dotenv
    streamlit
 requests==2.31.0
+plotly==5.22.0

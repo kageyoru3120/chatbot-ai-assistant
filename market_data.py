@@ -118,3 +118,66 @@ if __name__ == "__main__":
     print("\n=== Trending Coins ===")
     trending = get_trending_coins()
     print(trending)
+    # ============================================
+# CHART DATA (OHLC) UNTUK VISUALISASI
+# ============================================
+
+def get_coin_ohlc(coin_id="bitcoin", vs_currency="usd", days=7):
+    """Ambil data OHLC untuk chart candlestick"""
+    try:
+        url = f"{COINGECKO_BASE}/coins/{coin_id}/ohlc"
+        params = {
+            "vs_currency": vs_currency,
+            "days": days
+        }
+        
+        response = requests.get(url, params=params, timeout=10)
+        data = response.json()
+        
+        if isinstance(data, dict) and "error" in data:
+            return {"error": data["error"]}
+        
+        # Format: [timestamp, open, high, low, close]
+        # Convert ke format yang bisa dipakai plotly
+        import pandas as pd
+        from datetime import datetime
+        
+        df = pd.DataFrame(data, columns=['timestamp', 'open', 'high', 'low', 'close'])
+        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+        df['timestamp'] = df['timestamp'].dt.tz_localize('UTC').dt.tz_convert('Asia/Jakarta')
+        
+        return df
+        
+    except Exception as e:
+        return {"error": str(e)}
+
+def get_coin_market_chart(coin_id="bitcoin", vs_currency="usd", days=7):
+    """Ambil data harga historis untuk line chart"""
+    try:
+        url = f"{COINGECKO_BASE}/coins/{coin_id}/market_chart"
+        params = {
+            "vs_currency": vs_currency,
+            "days": days,
+            "interval": "daily"
+        }
+        
+        response = requests.get(url, params=params, timeout=10)
+        data = response.json()
+        
+        prices = data.get("prices", [])
+        market_caps = data.get("market_caps", [])
+        volumes = data.get("total_volumes", [])
+        
+        import pandas as pd
+        from datetime import datetime
+        
+        df = pd.DataFrame(prices, columns=['timestamp', 'price'])
+        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+        df['timestamp'] = df['timestamp'].dt.tz_localize('UTC').dt.tz_convert('Asia/Jakarta')
+        df['market_cap'] = [m[1] for m in market_caps] if market_caps else None
+        df['volume'] = [v[1] for v in volumes] if volumes else None
+        
+        return df
+        
+    except Exception as e:
+        return {"error": str(e)}

@@ -2,7 +2,9 @@ import streamlit as st
 import os
 from groq import Groq
 from datetime import datetime
-from market_data import get_crypto_price, get_trending_coins, get_coin_list
+from market_data import get_crypto_price, get_trending_coins, get_coin_list, get_coin_ohlc, get_coin_market_chart
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # ============================================
 # KONFIGURASI PAGE
@@ -188,6 +190,110 @@ MODELS = {
 }
 
 # ============================================
+# FUNGSI CHART
+# ============================================
+
+def create_candlestick_chart(df, coin_name="Bitcoin"):
+    """Buat chart candlestick interaktif pakai Plotly"""
+    fig = make_subplots(
+        rows=2, cols=1, 
+        shared_xaxes=True,
+        vertical_spacing=0.03,
+        row_heights=[0.7, 0.3],
+        subplot_titles=(f'{coin_name} Price', 'Volume')
+    )
+    
+    fig.add_trace(
+        go.Candlestick(
+            x=df['timestamp'],
+            open=df['open'],
+            high=df['high'],
+            low=df['low'],
+            close=df['close'],
+            name='OHLC',
+            increasing_line_color='#22c55e',
+            decreasing_line_color='#ef4444',
+            increasing_fillcolor='#22c55e',
+            decreasing_fillcolor='#ef4444'
+        ),
+        row=1, col=1
+    )
+    
+    df['volume'] = (df['high'] - df['low']) * 1000000
+    colors = ['#22c55e' if row['close'] >= row['open'] else '#ef4444' 
+              for _, row in df.iterrows()]
+    
+    fig.add_trace(
+        go.Bar(
+            x=df['timestamp'],
+            y=df['volume'],
+            name='Volume',
+            marker_color=colors,
+            opacity=0.3
+        ),
+        row=2, col=1
+    )
+    
+    fig.update_layout(
+        template='plotly_dark',
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(15,15,30,0.5)',
+        font=dict(color='white', family='Inter'),
+        xaxis_rangeslider_visible=False,
+        height=500,
+        margin=dict(l=50, r=50, t=50, b=50),
+        showlegend=False,
+        hovermode='x unified'
+    )
+    
+    fig.update_xaxes(showgrid=False, gridcolor='rgba(255,255,255,0.05)')
+    fig.update_yaxes(showgrid=True, gridcolor='rgba(255,255,255,0.05)')
+    
+    return fig
+
+def create_price_chart(df, coin_name="Bitcoin"):
+    """Buat line chart harga simpel"""
+    fig = go.Figure()
+    
+    fig.add_trace(
+        go.Scatter(
+            x=df['timestamp'],
+            y=df['price'],
+            mode='lines',
+            name='Price',
+            line=dict(color='#818cf8', width=2),
+            fill='tozeroy',
+            fillcolor='rgba(129,140,248,0.1)'
+        )
+    )
+    
+    fig.add_trace(
+        go.Scatter(
+            x=df['timestamp'],
+            y=df['price'],
+            mode='lines',
+            name='Price',
+            line=dict(color='#c084fc', width=3),
+            hoverinfo='skip'
+        )
+    )
+    
+    fig.update_layout(
+        template='plotly_dark',
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(15,15,30,0.5)',
+        font=dict(color='white', family='Inter'),
+        height=300,
+        margin=dict(l=50, r=50, t=30, b=30),
+        showlegend=False,
+        xaxis_showgrid=False,
+        yaxis_showgrid=True,
+        yaxis_gridcolor='rgba(255,255,255,0.05)'
+    )
+    
+    return fig
+
+# ============================================
 # SESSION STATE
 # ============================================
 if "messages" not in st.session_state:
@@ -201,6 +307,12 @@ if "selected_model" not in st.session_state:
 
 if "market_data" not in st.session_state:
     st.session_state.market_data = None
+
+if "ohlc_data" not in st.session_state:
+    st.session_state.ohlc_data = None
+
+if "chart_data" not in st.session_state:
+    st.session_state.chart_data = None
 
 # ============================================
 # SIDEBAR - TAB PENGATURAN & MARKET
@@ -245,13 +357,14 @@ with tab1:
     if st.button("🗑️ Hapus Chat", use_container_width=True):
         st.session_state.messages = []
         st.session_state.market_data = None
+        st.session_state.ohlc_data = None
+        st.session_state.chart_data = None
         st.rerun()
 
 with tab2:
     st.markdown("### 📈 Data Real-Time")
     st.caption("Data langsung dari CoinGecko — gratis & real-time")
     
-    # Pilih coin
     coin_list = get_coin_list()
     coin_names = list(coin_list.keys())
     
@@ -260,12 +373,16 @@ with tab2:
     
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("🔄 Refresh Harga", use_container_width=True):
+        if st.button("🔄 Refresh Harga + Chart", use_container_width=True):
             with st.spinner("Mengambil data dari CoinGecko..."):
                 data = get_crypto_price(selected_id)
+                ohlc_data = get_coin_ohlc(selected_id, days=7)
+                chart_data = get_coin_market_chart(selected_id, days=7)
                 
                 if "error" not in data:
                     st.session_state.market_data = data
+                    st.session_state.ohlc_data = ohlc_data if "error" not in ohlc_data else None
+                    st.session_state.chart_data = chart_data if "error" not in chart_data else None
                     
                     change_emoji = "🟢" if data['change_24h'] >= 0 else "🔴"
                     change_sign = "+" if data['change_24h'] >= 0 else ""
@@ -300,10 +417,9 @@ Berdasarkan data di atas, analisis teknikal {data['symbol'].upper()} gimana?"""
                 else:
                     st.error(f"❌ Error: {trending['error']}")
     
-    # Tampilkan data terakhir
+    # Tampilkan data terakhir + CHART
     if st.session_state.market_data:
         d = st.session_state.market_data
-        change_color = "green" if d['change_24h'] >= 0 else "red"
         change_sign = "+" if d['change_24h'] >= 0 else ""
         
         st.markdown("---")
@@ -322,6 +438,30 @@ Berdasarkan data di atas, analisis teknikal {data['symbol'].upper()} gimana?"""
             st.metric("Market Cap", f"${d['market_cap']:,.0f}")
         
         st.caption(f"📡 Source: {d['source']} | ⏰ {d['last_updated'][:19]}")
+        
+        # CHART CANDLESTICK
+        if st.session_state.ohlc_data is not None:
+            st.markdown("---")
+            st.markdown("### 📈 Chart 7 Hari")
+            
+            fig = create_candlestick_chart(
+                st.session_state.ohlc_data, 
+                coin_name=selected_name
+            )
+            st.plotly_chart(fig, use_container_width=True, key="candlestick_chart")
+            
+            st.caption("💡 Hover/scroll untuk zoom. Hijau = naik, Merah = turun.")
+        
+        # LINE CHART (fallback)
+        elif st.session_state.chart_data is not None:
+            st.markdown("---")
+            st.markdown("### 📈 Price Chart 7 Hari")
+            
+            fig = create_price_chart(
+                st.session_state.chart_data,
+                coin_name=selected_name
+            )
+            st.plotly_chart(fig, use_container_width=True, key="price_chart")
     
     # Input manual fallback
     with st.expander("📝 Input Data Manual (dari TradingView)"):
@@ -385,7 +525,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ============================================
-# QUICK PROMPTS (Market Focused)
+# QUICK PROMPTS
 # ============================================
 if not st.session_state.messages:
     st.markdown("### 🎯 Mulai dengan pertanyaan ini:")
