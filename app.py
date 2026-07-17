@@ -2,6 +2,7 @@ import streamlit as st
 import os
 from groq import Groq
 from datetime import datetime
+from market_data import get_crypto_price, get_trending_coins, get_coin_list
 
 # ============================================
 # KONFIGURASI PAGE
@@ -106,6 +107,29 @@ div[data-testid="stHorizontalBlock"] button:hover {
     border-color: rgba(99, 102, 241, 0.5) !important;
     color: #ffffff !important;
 }
+
+[data-testid="stChatMessage"] [data-testid="stChatMessageContent"] {
+    background: rgba(255, 255, 255, 0.1) !important;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px 20px 4px 20px;
+    padding: 16px;
+    color: #ffffff;
+}
+
+[data-testid="stChatMessage"]:nth-child(even) [data-testid="stChatMessageContent"] {
+    background: rgba(99, 102, 241, 0.2) !important;
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 20px 20px 20px 4px;
+}
+
+[data-testid="stChatInput"] {
+    background: rgba(255, 255, 255, 0.08) !important;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border-radius: 16px;
+    color: #ffffff;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -175,6 +199,9 @@ if "selected_persona" not in st.session_state:
 if "selected_model" not in st.session_state:
     st.session_state.selected_model = "⚡ Llama 3.1 8B (Cepat)"
 
+if "market_data" not in st.session_state:
+    st.session_state.market_data = None
+
 # ============================================
 # SIDEBAR - TAB PENGATURAN & MARKET
 # ============================================
@@ -217,73 +244,131 @@ with tab1:
     
     if st.button("🗑️ Hapus Chat", use_container_width=True):
         st.session_state.messages = []
+        st.session_state.market_data = None
         st.rerun()
-    
-    st.divider()
-    st.markdown("**Ditenagai oleh:**")
-    st.markdown("🚀 Groq  •  🦙 Llama 3  •  📊 Streamlit")
 
 with tab2:
-    st.markdown("### 📈 Input Data Market")
-    st.caption("Masukkan data dari TradingView untuk analisis AI")
+    st.markdown("### 📈 Data Real-Time")
+    st.caption("Data langsung dari CoinGecko — gratis & real-time")
     
-    # Asset & Timeframe
+    # Pilih coin
+    coin_list = get_coin_list()
+    coin_names = list(coin_list.keys())
+    
+    selected_name = st.selectbox("💱 Pilih Crypto", coin_names, index=0)
+    selected_id = coin_list[selected_name]
+    
     col1, col2 = st.columns(2)
     with col1:
-        asset = st.text_input("💱 Asset", value="BTC/USDT", key="asset_input")
+        if st.button("🔄 Refresh Harga", use_container_width=True):
+            with st.spinner("Mengambil data dari CoinGecko..."):
+                data = get_crypto_price(selected_id)
+                
+                if "error" not in data:
+                    st.session_state.market_data = data
+                    
+                    change_emoji = "🟢" if data['change_24h'] >= 0 else "🔴"
+                    change_sign = "+" if data['change_24h'] >= 0 else ""
+                    
+                    market_msg = f"""📊 Data Real-Time {data['symbol'].upper()}/USD (CoinGecko):
+
+💰 Harga: ${data['price']:,.2f}
+{change_emoji} Change 24h: {change_sign}{data['change_24h']:.2f}%
+📦 Volume 24h: ${data['volume_24h']:,.0f}
+🏦 Market Cap: ${data['market_cap']:,.0f}
+⏰ Last Updated: {data['last_updated']}
+
+Berdasarkan data di atas, analisis teknikal {data['symbol'].upper()} gimana?"""
+                    
+                    st.session_state.messages.append({"role": "user", "content": market_msg})
+                    st.rerun()
+                else:
+                    st.error(f"❌ Gagal ambil data: {data['error']}")
+    
     with col2:
-        timeframe = st.selectbox(
-            "⏱️ Timeframe",
-            ["1m", "5m", "15m", "1H", "4H", "1D", "1W"],
-            index=3
-        )
+        if st.button("🔥 Trending Coins", use_container_width=True):
+            with st.spinner("Mengambil trending..."):
+                trending = get_trending_coins()
+                if "error" not in trending:
+                    trend_msg = "🔥 Crypto yang lagi trending hari ini:\n\n"
+                    for i, coin in enumerate(trending, 1):
+                        trend_msg += f"{i}. **{coin['name']}** ({coin['symbol']}) — Rank #{coin['market_cap_rank']}\n"
+                    trend_msg += "\nKasih analisis singkat untuk 3 coin teratas dong!"
+                    
+                    st.session_state.messages.append({"role": "user", "content": trend_msg})
+                    st.rerun()
+                else:
+                    st.error(f"❌ Error: {trending['error']}")
     
-    # Harga
-    current_price = st.number_input("💰 Harga Sekarang ($)", value=0.0, step=0.01, key="price_input")
-    
-    # Indikator Teknikal (opsional, dalam expander)
-    with st.expander("📉 Indikator Teknikal (opsional)"):
-        col_rsi, col_macd = st.columns(2)
-        with col_rsi:
-            rsi = st.number_input("RSI (0-100)", min_value=0, max_value=100, value=50)
-        with col_macd:
-            macd = st.number_input("MACD", value=0.0, step=0.01)
+    # Tampilkan data terakhir
+    if st.session_state.market_data:
+        d = st.session_state.market_data
+        change_color = "green" if d['change_24h'] >= 0 else "red"
+        change_sign = "+" if d['change_24h'] >= 0 else ""
         
-        col_vol, col_atr = st.columns(2)
+        st.markdown("---")
+        st.markdown(f"**{d['symbol'].upper()}/USD**")
+        
+        col_price, col_change = st.columns(2)
+        with col_price:
+            st.metric("Harga", f"${d['price']:,.2f}")
+        with col_change:
+            st.metric("Change 24h", f"{change_sign}{d['change_24h']:.2f}%")
+        
+        col_vol, col_cap = st.columns(2)
         with col_vol:
-            volume = st.number_input("Volume 24h", value=0.0, step=1000000.0)
-        with col_atr:
-            atr = st.number_input("ATR", value=0.0, step=0.01)
+            st.metric("Volume 24h", f"${d['volume_24h']:,.0f}")
+        with col_cap:
+            st.metric("Market Cap", f"${d['market_cap']:,.0f}")
         
-        col_sup, col_res = st.columns(2)
-        with col_sup:
-            support = st.number_input("Support ($)", value=0.0, step=0.01)
-        with col_res:
-            resistance = st.number_input("Resistance ($)", value=0.0, step=0.01)
+        st.caption(f"📡 Source: {d['source']} | ⏰ {d['last_updated'][:19]}")
     
-    # Tombol Analisis
-    if st.button("🚀 Analisis Data Ini", use_container_width=True):
-        # Bangun konteks market
-        market_context = f"""Data Market {asset} ({timeframe}):
-💰 Harga Sekarang: ${current_price:,.2f}"""
+    # Input manual fallback
+    with st.expander("📝 Input Data Manual (dari TradingView)"):
+        st.caption("Kalau CoinGecko error atau mau analisis forex/stock")
         
-        if rsi != 50:
-            market_context += f"\n📊 RSI: {rsi}"
-        if macd != 0:
-            market_context += f"\n📈 MACD: {macd}"
-        if volume != 0:
-            market_context += f"\n📦 Volume 24h: ${volume:,.0f}"
-        if atr != 0:
-            market_context += f"\n📏 ATR: {atr}"
-        if support != 0:
-            market_context += f"\n🟢 Support: ${support:,.2f}"
-        if resistance != 0:
-            market_context += f"\n🔴 Resistance: ${resistance:,.2f}"
+        col1, col2 = st.columns(2)
+        with col1:
+            manual_asset = st.text_input("Asset", value="BTC/USDT", key="manual_asset")
+        with col2:
+            manual_tf = st.selectbox(
+                "Timeframe",
+                ["1m", "5m", "15m", "1H", "4H", "1D", "1W"],
+                index=3,
+                key="manual_tf"
+            )
         
-        market_context += f"\n\nBerdasarkan data di atas, analisis teknikal {asset} gimana?"
+        manual_price = st.number_input("Harga Sekarang ($)", value=0.0, step=0.01, key="manual_price")
         
-        st.session_state.messages.append({"role": "user", "content": market_context})
-        st.rerun()
+        with st.expander("📉 Indikator Teknikal"):
+            col_rsi, col_macd = st.columns(2)
+            with col_rsi:
+                manual_rsi = st.number_input("RSI", min_value=0, max_value=100, value=50, key="manual_rsi")
+            with col_macd:
+                manual_macd = st.number_input("MACD", value=0.0, step=0.01, key="manual_macd")
+            
+            col_sup, col_res = st.columns(2)
+            with col_sup:
+                manual_sup = st.number_input("Support ($)", value=0.0, step=0.01, key="manual_sup")
+            with col_res:
+                manual_res = st.number_input("Resistance ($)", value=0.0, step=0.01, key="manual_res")
+        
+        if st.button("🚀 Analisis Manual", use_container_width=True, key="manual_btn"):
+            manual_context = f"""Data Market {manual_asset} ({manual_tf}):
+💰 Harga: ${manual_price:,.2f}"""
+            if manual_rsi != 50:
+                manual_context += f"\n📊 RSI: {manual_rsi}"
+            if manual_macd != 0:
+                manual_context += f"\n📈 MACD: {manual_macd}"
+            if manual_sup != 0:
+                manual_context += f"\n🟢 Support: ${manual_sup:,.2f}"
+            if manual_res != 0:
+                manual_context += f"\n🔴 Resistance: ${manual_res:,.2f}"
+            
+            manual_context += f"\n\nBerdasarkan data di atas, analisis teknikal {manual_asset} gimana?"
+            
+            st.session_state.messages.append({"role": "user", "content": manual_context})
+            st.rerun()
 
 # ============================================
 # HEADER
@@ -308,8 +393,8 @@ if not st.session_state.messages:
     quick_prompts = [
         "Analisis BTC minggu ini, bullish or bearish?",
         "Jelasin RSI itu apa sih? Gimana cara bacanya?",
-        "Support & Resistance itu kayak gimana? Kasih analogi dong",
-        "Tips aman trading crypto buat pemula"
+        "Kasih ide konten TikTok tentang teknologi AI",
+        "Bantu aku debug Python: list index out of range"
     ]
     
     cols = st.columns(2)
