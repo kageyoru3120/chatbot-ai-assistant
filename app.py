@@ -305,6 +305,73 @@ def create_price_chart(df, coin_name="Bitcoin"):
     return fig
 
 # ============================================
+# LIVE PRICE TICKER
+# ============================================
+@st.cache_data(ttl=30, show_spinner=False)
+def get_ticker_snapshot(coin_id):
+    """Ambil snapshot harga, di-cache 30 detik biar nggak spam API tiap rerun."""
+    return get_crypto_price(coin_id)
+
+def render_price_ticker(coin_id, coin_name):
+    data = get_ticker_snapshot(coin_id)
+
+    if not data or "error" in data:
+        st.markdown("""
+        <div style="
+            background: var(--terminal-panel);
+            border: 1px solid var(--terminal-border);
+            border-radius: 6px;
+            padding: 14px 24px;
+            margin: 0 0 24px 0;
+            font-family: 'IBM Plex Mono', monospace;
+            color: rgba(255,255,255,0.45);
+            font-size: 0.85rem;
+            text-align: center;
+        ">
+            ⚠️ Data harga belum bisa dimuat. Klik "Refresh Harga" di sidebar.
+        </div>
+        """, unsafe_allow_html=True)
+        return
+
+    change = data['change_24h']
+    color = "#22c55e" if change >= 0 else "#ef4444"
+    arrow = "▲" if change >= 0 else "▼"
+    sign = "+" if change >= 0 else ""
+
+    st.markdown(f"""
+    <div style="
+        background: #0d0f14;
+        border: 1px solid rgba(240, 180, 41, 0.15);
+        border-radius: 6px;
+        padding: 14px 24px;
+        margin: 0 0 24px 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        position: relative;
+        z-index: 1;
+    ">
+        <div style="display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 1rem; font-weight: 600; color: #f0b429; letter-spacing: 1px;">
+                {data['symbol'].upper()}/USD
+            </span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 1.6rem; font-weight: 700; color: #f4f4f2;">
+                ${data['price']:,.2f}
+            </span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 1rem; font-weight: 600; color: {color};">
+                {arrow} {sign}{change:.2f}%
+            </span>
+        </div>
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; color: rgba(255,255,255,0.45); text-align: right; line-height: 1.5;">
+            VOL 24H: ${data['volume_24h']:,.0f}<br>
+            MCAP: ${data['market_cap']:,.0f}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ============================================
 # SESSION STATE
 # ============================================
 if "messages" not in st.session_state:
@@ -497,6 +564,11 @@ st.markdown("""
     </p>
 </div>
 """, unsafe_allow_html=True)
+
+# ============================================
+# LIVE PRICE TICKER (tampil di atas, ikut crypto yang dipilih di sidebar)
+# ============================================
+render_price_ticker(selected_id, selected_name)
 
 # ============================================
 # QUICK PROMPTS
