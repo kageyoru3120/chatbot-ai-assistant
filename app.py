@@ -526,10 +526,13 @@ if "chart_data" not in st.session_state:
 if "selected_timeframe" not in st.session_state:
     st.session_state.selected_timeframe = "📊 Swing (4H-1D)"
 
+if "portfolio" not in st.session_state:
+    st.session_state.portfolio = []
+
 # ============================================
 # SIDEBAR
 # ============================================
-tab1, tab2 = st.sidebar.tabs(["⚙️ Pengaturan", "📊 Market"])
+tab1, tab2, tab3 = st.sidebar.tabs(["⚙️ Pengaturan", "📊 Market", "💼 Portfolio"])
 
 with tab1:
     st.markdown("### ⚙️ Pengaturan")
@@ -689,6 +692,105 @@ Berdasarkan data di atas, analisis teknikal {data['symbol'].upper()} gimana untu
             
             st.session_state.messages.append({"role": "user", "content": manual_context})
             st.rerun()
+
+with tab3:
+    st.markdown("### 💼 Portfolio Saya")
+    st.caption("Data cuma tersimpan selama sesi ini berjalan (hilang kalau refresh)")
+
+    with st.expander("➕ Tambah Posisi", expanded=len(st.session_state.portfolio) == 0):
+        p_coin_name = st.selectbox("Koin", coin_names, key="p_coin_select")
+        p_coin_id = coin_list[p_coin_name]
+
+        p_col1, p_col2 = st.columns(2)
+        with p_col1:
+            p_amount = st.number_input("Jumlah Koin", min_value=0.0, value=0.0, step=0.0001, format="%.6f", key="p_amount")
+        with p_col2:
+            p_avg_price = st.number_input("Harga Beli Rata-rata ($)", min_value=0.0, value=0.0, step=0.01, key="p_avg_price")
+
+        if st.button("➕ Tambah ke Portfolio", use_container_width=True, key="p_add_btn"):
+            if p_amount > 0 and p_avg_price > 0:
+                st.session_state.portfolio.append({
+                    "coin_id": p_coin_id,
+                    "coin_name": p_coin_name,
+                    "amount": p_amount,
+                    "avg_price": p_avg_price
+                })
+                st.rerun()
+            else:
+                st.warning("⚠️ Isi jumlah koin & harga beli dulu ya")
+
+    if not st.session_state.portfolio:
+        st.caption("Belum ada posisi. Tambahin dulu di atas 👆")
+    else:
+        total_modal = 0.0
+        total_value = 0.0
+
+        for idx, pos in enumerate(st.session_state.portfolio):
+            snap = get_ticker_snapshot(pos["coin_id"])
+            current_price = snap["price"] if snap and "error" not in snap else None
+            symbol = snap["symbol"].upper() if snap and "error" not in snap else pos["coin_name"]
+
+            modal = pos["amount"] * pos["avg_price"]
+            total_modal += modal
+
+            st.markdown(f"**{pos['coin_name']}** — {pos['amount']:,.6f} coin @ ${pos['avg_price']:,.2f}")
+
+            if current_price is not None:
+                value_now = pos["amount"] * current_price
+                total_value += value_now
+                pnl = value_now - modal
+                pnl_pct = (pnl / modal * 100) if modal > 0 else 0
+                pnl_color = "#22c55e" if pnl >= 0 else "#ef4444"
+                pnl_sign = "+" if pnl >= 0 else ""
+
+                st.markdown(f"""
+                <div style="
+                    background: #0d0f14;
+                    border: 1px solid rgba(240, 180, 41, 0.15);
+                    border-radius: 6px;
+                    padding: 10px 14px;
+                    margin-bottom: 4px;
+                    font-family: 'IBM Plex Mono', monospace;
+                    font-size: 0.8rem;
+                ">
+                    Harga sekarang: ${current_price:,.2f}<br>
+                    Nilai sekarang: ${value_now:,.2f}<br>
+                    <span style="color: {pnl_color}; font-weight: 700;">P&amp;L: {pnl_sign}${pnl:,.2f} ({pnl_sign}{pnl_pct:.2f}%)</span>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.caption("⚠️ Harga sekarang nggak bisa dimuat")
+
+            if st.button("🗑️ Hapus posisi ini", key=f"p_del_{idx}", use_container_width=True):
+                st.session_state.portfolio.pop(idx)
+                st.rerun()
+
+            st.divider()
+
+        if total_modal > 0 and total_value > 0:
+            total_pnl = total_value - total_modal
+            total_pnl_pct = (total_pnl / total_modal * 100)
+            t_color = "#22c55e" if total_pnl >= 0 else "#ef4444"
+            t_sign = "+" if total_pnl >= 0 else ""
+
+            st.markdown(f"""
+            <div style="
+                background: #0d0f14;
+                border: 1px solid rgba(240, 180, 41, 0.3);
+                border-radius: 6px;
+                padding: 14px;
+                font-family: 'IBM Plex Mono', monospace;
+            ">
+                <div style="font-size: 0.72rem; color: rgba(255,255,255,0.45); letter-spacing: 1px; margin-bottom: 6px;">
+                    TOTAL PORTFOLIO
+                </div>
+                <div style="font-size: 0.85rem; margin-bottom: 4px;">Modal: ${total_modal:,.2f}</div>
+                <div style="font-size: 0.85rem; margin-bottom: 4px;">Nilai Sekarang: ${total_value:,.2f}</div>
+                <div style="font-size: 1.1rem; font-weight: 700; color: {t_color};">
+                    P&amp;L: {t_sign}${total_pnl:,.2f} ({t_sign}{total_pnl_pct:.2f}%)
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
 # ============================================
 # HEADER
