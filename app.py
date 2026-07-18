@@ -178,7 +178,7 @@ ATURAN WAJIB:
    - MACD = "persimpangan jalan" (golden cross/death cross)
    - Support = "lantai" harga, Resistance = "atap" harga
    - Volume = "semangat pasar"
-3. Sebutkan timeframe analisis (1H, 4H, 1D)
+3. Kalau ada "Konteks timeframe" di pesan user, WAJIB sesuaikan gaya analisis sama timeframe itu (scalping = fokus pergerakan cepat, swing = tren menengah, long-term = tren besar). Kalau nggak ada, sebutkan timeframe analisis (1H, 4H, 1D)
 4. Kasih 2 skenario: bullish case & bearish case
 5. Sebutkan level support & resistance kunci
 6. Jangan overconfident
@@ -190,11 +190,7 @@ FORMAT JAWABAN:
 🎯 Level Kunci: Support $X | Resistance $Y
 🐂 Bullish Case: [skenario naik + trigger]
 🐻 Bearish Case: [skenario turun + trigger]
-⚠️ Disclaimer: Bukan saran finansial. DYOR!""",
-    
-    "🧑‍💻 Programmer": "Kamu adalah programmer senior yang ramah. Jelaskan konsep coding dengan analogi sederhana. Gunakan bahasa Indonesia santai.",
-    
-    "🤙 Teman Ngobrol": "Kamu adalah teman ngobrol santai. Jawab dengan gaya conversational, pakai bahasa Indonesia sehari-hari, dan sesekali kasih emoji."
+⚠️ Disclaimer: Bukan saran finansial. DYOR!"""
 }
 
 MODELS = {
@@ -202,6 +198,21 @@ MODELS = {
     "🧠 Llama 3.3 70B (Pintar)": "llama-3.3-70b-versatile",
     "🔥 Mixtral 8x7B": "mixtral-8x7b-32768",
     "💎 Gemma 2 9B": "gemma2-9b-it"
+}
+
+TIMEFRAMES = {
+    "⚡ Scalping (15m-1H)": {
+        "days": 1,
+        "context": "Trader lagi cari peluang SCALPING/intraday cepat (hitungan menit-jam). Fokus ke pergerakan harga jangka pendek, volatilitas, dan level entry/exit yang tajam. Jangan kasih analisis makro jangka panjang."
+    },
+    "📊 Swing (4H-1D)": {
+        "days": 7,
+        "context": "Trader lagi cari peluang SWING trading (posisi ditahan beberapa hari). Fokus ke tren jangka menengah, level support/resistance mingguan, dan momentum."
+    },
+    "📈 Long-term (1W+)": {
+        "days": 90,
+        "context": "Trader lagi mikir posisi JANGKA PANJANG (mingguan-bulanan). Fokus ke tren besar, siklus market, dan level kunci jangka panjang. Nggak perlu bahas noise pergerakan harian."
+    }
 }
 
 # ============================================
@@ -512,6 +523,9 @@ if "ohlc_data" not in st.session_state:
 if "chart_data" not in st.session_state:
     st.session_state.chart_data = None
 
+if "selected_timeframe" not in st.session_state:
+    st.session_state.selected_timeframe = "📊 Swing (4H-1D)"
+
 # ============================================
 # SIDEBAR
 # ============================================
@@ -519,15 +533,10 @@ tab1, tab2 = st.sidebar.tabs(["⚙️ Pengaturan", "📊 Market"])
 
 with tab1:
     st.markdown("### ⚙️ Pengaturan")
-    
-    persona = st.selectbox(
-        "🎭 Persona AI",
-        options=list(PERSONAS.keys()),
-        index=list(PERSONAS.keys()).index(st.session_state.selected_persona)
-    )
-    st.session_state.selected_persona = persona
-    st.caption(f"*{persona}* aktif")
-    
+
+    st.session_state.selected_persona = "📈 Analis Market Pro"
+    st.caption("🎭 Persona AI: **Analis Market Pro** (khusus analisis crypto)")
+
     st.divider()
     
     model = st.selectbox(
@@ -568,14 +577,22 @@ with tab2:
     
     selected_name = st.selectbox("💱 Pilih Crypto", coin_names, index=0)
     selected_id = coin_list[selected_name]
-    
+
+    timeframe = st.selectbox(
+        "⏱️ Timeframe Trading",
+        options=list(TIMEFRAMES.keys()),
+        index=list(TIMEFRAMES.keys()).index(st.session_state.selected_timeframe)
+    )
+    st.session_state.selected_timeframe = timeframe
+    tf_config = TIMEFRAMES[timeframe]
+
     col1, col2 = st.columns(2)
     with col1:
         if st.button("🔄 Refresh Harga", use_container_width=True):
             with st.spinner("Mengambil data..."):
                 data = get_crypto_price(selected_id)
-                ohlc_data = get_coin_ohlc(selected_id, days=7)
-                chart_data = get_coin_market_chart(selected_id, days=7)
+                ohlc_data = get_coin_ohlc(selected_id, days=tf_config["days"])
+                chart_data = get_coin_market_chart(selected_id, days=tf_config["days"])
                 
                 if "error" not in data:
                     st.session_state.market_data = data
@@ -593,7 +610,9 @@ with tab2:
 🏦 Market Cap: ${data['market_cap']:,.0f}
 ⏰ Last Updated: {data['last_updated']}
 
-Berdasarkan data di atas, analisis teknikal {data['symbol'].upper()} gimana?"""
+Konteks timeframe: {tf_config['context']}
+
+Berdasarkan data di atas, analisis teknikal {data['symbol'].upper()} gimana untuk timeframe {timeframe}?"""
                     
                     st.session_state.messages.append({"role": "user", "content": market_msg})
                     st.rerun()
@@ -739,9 +758,10 @@ for i, message in enumerate(st.session_state.messages):
     # Kita cek apakah message AI ini adalah response terakhir dan kita punya chart data
     if message["role"] == "assistant" and i == len(st.session_state.messages) - 1 and not needs_ai_response:
         # Tampilkan chart di main area setelah AI response terakhir
+        _tf_days = TIMEFRAMES[st.session_state.selected_timeframe]["days"]
         if st.session_state.ohlc_data is not None:
             st.markdown("---")
-            st.markdown("### 📊 Chart 7 Hari")
+            st.markdown(f"### 📊 Chart {_tf_days} Hari ({st.session_state.selected_timeframe})")
             
             fig = create_candlestick_chart(
                 st.session_state.ohlc_data, 
@@ -752,7 +772,7 @@ for i, message in enumerate(st.session_state.messages):
         
         elif st.session_state.chart_data is not None:
             st.markdown("---")
-            st.markdown("### 📈 Price Chart 7 Hari")
+            st.markdown(f"### 📈 Price Chart {_tf_days} Hari ({st.session_state.selected_timeframe})")
             
             fig = create_price_chart(
                 st.session_state.chart_data,
